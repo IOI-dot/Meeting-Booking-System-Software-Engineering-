@@ -48,11 +48,12 @@ function findByEmail(email) {
  * @param {Object} userData - The user data ({ email, password, role }).
  * @returns {Object} The newly created user (without password).
  */
-function createUser({ email, password, role }) {
+function createUser({ fullName, email, password, role }) {
     const users = getAllUsers();
 
     const newUser = {
         id: users.length > 0 ? users[users.length - 1].id + 1 : 1,
+        fullName,
         email,
         password, // Already hashed before being passed here
         role,
