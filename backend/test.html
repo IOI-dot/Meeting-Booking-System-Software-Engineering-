@@ -202,18 +202,23 @@
 </head>
 <body>
 
-    <h1>🔐 Auth API Tester</h1>
-    <p class="subtitle">Test your signup & login endpoints</p>
+    <h1>🔐 Auth & Room API Tester</h1>
+    <p class="subtitle">Test your signup, login & room search endpoints</p>
 
-    <!-- Toggle between Signup and Login -->
+    <!-- Toggle between Signup, Login and Search -->
     <div class="toggle-container">
         <button class="toggle-btn active" id="btn-signup" onclick="showForm('signup')">Sign Up</button>
         <button class="toggle-btn" id="btn-login" onclick="showForm('login')">Login</button>
+        <button class="toggle-btn" id="btn-search" onclick="showForm('search')">Room Search</button>
     </div>
 
     <!-- Signup Form -->
     <div class="form-container" id="form-signup">
         <form onsubmit="handleSignup(event)">
+            <div class="form-group">
+                <label for="signup-fullname">Full Name</label>
+                <input type="text" id="signup-fullname" placeholder="John Doe">
+            </div>
             <div class="form-group">
                 <label for="signup-email">Email</label>
                 <input type="text" id="signup-email" placeholder="username@aucegypt.edu">
@@ -253,6 +258,27 @@
         </form>
     </div>
 
+    <!-- Room Search Form -->
+    <div class="form-container hidden" id="form-search">
+        <form onsubmit="handleSearch(event)">
+            <div class="form-group">
+                <label for="search-capacity">Capacity</label>
+                <input type="number" id="search-capacity" placeholder="Enter capacity (1-30)">
+            </div>
+            <div class="form-group">
+                <label>Technologies Required</label>
+                <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 8px;">
+                    <label style="display: flex; align-items: center; gap: 8px; color: #e0e0e0; font-size: 0.95rem; text-transform: none; letter-spacing: 0;"><input type="checkbox" value="4k display" class="tech-cb" style="width:auto; margin:0;"> 4K Display</label>
+                    <label style="display: flex; align-items: center; gap: 8px; color: #e0e0e0; font-size: 0.95rem; text-transform: none; letter-spacing: 0;"><input type="checkbox" value="whiteboards" class="tech-cb" style="width:auto; margin:0;"> Whiteboards</label>
+                    <label style="display: flex; align-items: center; gap: 8px; color: #e0e0e0; font-size: 0.95rem; text-transform: none; letter-spacing: 0;"><input type="checkbox" value="projector" class="tech-cb" style="width:auto; margin:0;"> Projector (Single)</label>
+                    <label style="display: flex; align-items: center; gap: 8px; color: #e0e0e0; font-size: 0.95rem; text-transform: none; letter-spacing: 0;"><input type="checkbox" value="projectors" class="tech-cb" style="width:auto; margin:0;"> Projectors (Multiple)</label>
+                    <label style="display: flex; align-items: center; gap: 8px; color: #e0e0e0; font-size: 0.95rem; text-transform: none; letter-spacing: 0;"><input type="checkbox" value="video conf." class="tech-cb" style="width:auto; margin:0;"> Video Conf.</label>
+                </div>
+            </div>
+            <button type="submit">Search Rooms</button>
+        </form>
+    </div>
+
     <!-- Response Display -->
     <div class="response-container">
         <p class="response-label">Server Response</p>
@@ -260,13 +286,16 @@
     </div>
 
     <script>
-        const API_BASE = 'http://localhost:3000/api/auth';
+        const AUTH_API = 'http://localhost:3000/api/auth';
+        const ROOMS_API = 'http://localhost:3000/api/rooms';
 
         function showForm(type) {
             document.getElementById('form-signup').classList.toggle('hidden', type !== 'signup');
             document.getElementById('form-login').classList.toggle('hidden', type !== 'login');
+            document.getElementById('form-search').classList.toggle('hidden', type !== 'search');
             document.getElementById('btn-signup').classList.toggle('active', type === 'signup');
             document.getElementById('btn-login').classList.toggle('active', type === 'login');
+            document.getElementById('btn-search').classList.toggle('active', type === 'search');
         }
 
         function displayResponse(status, data) {
@@ -280,6 +309,7 @@
         async function handleSignup(e) {
             e.preventDefault();
             const body = {
+                fullName: document.getElementById('signup-fullname').value,
                 email: document.getElementById('signup-email').value,
                 password: document.getElementById('signup-password').value,
                 confirmPassword: document.getElementById('signup-confirm').value,
@@ -287,7 +317,7 @@
             };
 
             try {
-                const res = await fetch(`${API_BASE}/signup`, {
+                const res = await fetch(`${AUTH_API}/signup`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(body)
@@ -307,7 +337,31 @@
             };
 
             try {
-                const res = await fetch(`${API_BASE}/login`, {
+                const res = await fetch(`${AUTH_API}/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+                const data = await res.json();
+                displayResponse(res.status, data);
+            } catch (err) {
+                displayResponse(500, { error: 'Could not connect to server. Is it running?' });
+            }
+        }
+
+        async function handleSearch(e) {
+            e.preventDefault();
+            
+            const checkboxes = document.querySelectorAll('.tech-cb:checked');
+            const technologies = Array.from(checkboxes).map(cb => cb.value);
+
+            const body = {
+                capacity: document.getElementById('search-capacity').value,
+                technologies: technologies
+            };
+
+            try {
+                const res = await fetch(`${ROOMS_API}/search`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(body)

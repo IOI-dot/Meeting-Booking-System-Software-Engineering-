@@ -29,10 +29,10 @@ const router = express.Router();
  */
 router.post('/signup', async (req, res) => {
     try {
-        const { email, password, confirmPassword, role } = req.body;
+        const { fullName, email, password, confirmPassword, role } = req.body;
 
         // 1. Run all validations
-        const errors = validateSignup({ email, password, confirmPassword, role });
+        const errors = validateSignup({ fullName, email, password, confirmPassword, role });
         if (errors.length > 0) {
             return res.status(400).json({
                 success: false,
@@ -57,6 +57,7 @@ router.post('/signup', async (req, res) => {
 
         // 4. Create the user
         const newUser = User.createUser({
+            fullName: fullName.trim(),
             email: email.trim().toLowerCase(),
             password: hashedPassword,
             role: role.toLowerCase().trim()

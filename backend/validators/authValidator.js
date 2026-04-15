@@ -6,6 +6,26 @@
  */
 
 /**
+ * Validates the user's full name.
+ * - Must not be empty
+ * - Must be at least 2 characters
+ * 
+ * @param {string} fullName 
+ * @returns {string|null} Error message or null if valid.
+ */
+function validateFullName(fullName) {
+    if (!fullName || fullName.trim() === '') {
+        return 'Full name is required.';
+    }
+
+    if (fullName.trim().length < 2) {
+        return 'Full name must be at least 2 characters.';
+    }
+
+    return null;
+}
+
+/**
  * Validates the AUC email format: username@aucegypt.edu
  * - Must not be empty
  * - Must end with @aucegypt.edu
@@ -90,11 +110,14 @@ function validateRole(role) {
 /**
  * Runs all signup validations and returns an array of error messages.
  * 
- * @param {Object} body - The request body { email, password, confirmPassword, role }
+ * @param {Object} body - The request body { fullName, email, password, confirmPassword, role }
  * @returns {string[]} Array of error messages (empty if all valid).
  */
-function validateSignup({ email, password, confirmPassword, role }) {
+function validateSignup({ fullName, email, password, confirmPassword, role }) {
     const errors = [];
+
+    const nameErr = validateFullName(fullName);
+    if (nameErr) errors.push(nameErr);
 
     const emailErr = validateEmail(email);
     if (emailErr) errors.push(emailErr);
@@ -135,5 +158,6 @@ module.exports = {
     validateEmail,
     validatePassword,
     validatePasswordMatch,
+    validateFullName,
     validateRole
 };
