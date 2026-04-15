@@ -1,0 +1,26 @@
+[
+  {
+    "id": 1,
+    "fullName": "John Doe",
+    "email": "testuser1@aucegypt.edu",
+    "password": "$2b$10$B/q2ZpcPXH4J29d9Rrdgb.d5bOdV0O/bKHIVUf99tvghtT5QtT6V6",
+    "role": "student",
+    "createdAt": "2026-04-15T12:31:46.077Z"
+  },
+  {
+    "id": 2,
+    "fullName": "Jane Doe",
+    "email": "testuser2@aucegypt.edu",
+    "password": "$2b$10$mFhj9JNwHLrQOHb2cBhml.vYXwQVn3K6eFRDuCorrI2JxaSDPaS5a",
+    "role": "ta",
+    "createdAt": "2026-04-15T12:31:46.142Z"
+  },
+  {
+    "id": 3,
+    "fullName": "Radwa AbuElfootuh",
+    "email": "radwaayman@aucegypt.edu",
+    "password": "$2b$10$qjcpQ9nEcbwIlZbil/yoOuriknDIpPaKRn4QQT/8Yz4GcGD.jOzzS",
+    "role": "student",
+    "createdAt": "2026-04-15T12:40:07.091Z"
+  }
+]

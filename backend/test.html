@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Auth API Tester</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #0f0f1a;
+            color: #e0e0e0;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 40px 20px;
+        }
+
+        h1 {
+            font-size: 2rem;
+            margin-bottom: 8px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .subtitle {
+            color: #888;
+            margin-bottom: 32px;
+            font-size: 0.95rem;
+        }
+
+        .toggle-container {
+            display: flex;
+            gap: 0;
+            margin-bottom: 32px;
+            border-radius: 12px;
+            overflow: hidden;
+            border: 1px solid #2a2a40;
+        }
+
+        .toggle-btn {
+            padding: 12px 36px;
+            border: none;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 600;
+            background: #1a1a2e;
+            color: #888;
+            transition: all 0.3s ease;
+        }
+
+        .toggle-btn.active {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: #fff;
+        }
+
+        .toggle-btn:hover:not(.active) {
+            background: #22223a;
+            color: #bbb;
+        }
+
+        .form-container {
+            background: #1a1a2e;
+            border: 1px solid #2a2a40;
+            border-radius: 16px;
+            padding: 32px;
+            width: 100%;
+            max-width: 440px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 6px;
+            font-size: 0.85rem;
+            color: #aaa;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        input, select {
+            width: 100%;
+            padding: 12px 16px;
+            border: 1px solid #2a2a40;
+            border-radius: 8px;
+            background: #12121e;
+            color: #e0e0e0;
+            font-size: 0.95rem;
+            transition: border-color 0.3s;
+            outline: none;
+        }
+
+        input:focus, select:focus {
+            border-color: #667eea;
+        }
+
+        select {
+            cursor: pointer;
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23888' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 12px center;
+        }
+
+        button[type="submit"] {
+            width: 100%;
+            padding: 14px;
+            border: none;
+            border-radius: 8px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: #fff;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            margin-top: 8px;
+        }
+
+        button[type="submit"]:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        button[type="submit"]:active {
+            transform: translateY(0);
+        }
+
+        .response-container {
+            margin-top: 24px;
+            width: 100%;
+            max-width: 440px;
+        }
+
+        .response-label {
+            font-size: 0.85rem;
+            color: #aaa;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+            font-weight: 500;
+        }
+
+        .response-box {
+            background: #12121e;
+            border: 1px solid #2a2a40;
+            border-radius: 12px;
+            padding: 20px;
+            font-family: 'Consolas', 'Courier New', monospace;
+            font-size: 0.85rem;
+            line-height: 1.6;
+            white-space: pre-wrap;
+            word-break: break-word;
+            min-height: 80px;
+            color: #ccc;
+            transition: border-color 0.3s;
+        }
+
+        .response-box.success {
+            border-color: #4ade80;
+            color: #4ade80;
+        }
+
+        .response-box.error {
+            border-color: #f87171;
+            color: #f87171;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 2px 10px;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+
+        .status-badge.s200, .status-badge.s201 {
+            background: rgba(74, 222, 128, 0.15);
+            color: #4ade80;
+        }
+
+        .status-badge.s400, .status-badge.s401, .status-badge.s409 {
+            background: rgba(248, 113, 113, 0.15);
+            color: #f87171;
+        }
+
+        .status-badge.s500 {
+            background: rgba(251, 191, 36, 0.15);
+            color: #fbbf24;
+        }
+
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+
+    <h1>🔐 Auth & Room API Tester</h1>
+    <p class="subtitle">Test your signup, login & room search endpoints</p>
+
+    <!-- Toggle between Signup, Login and Search -->
+    <div class="toggle-container">
+        <button class="toggle-btn active" id="btn-signup" onclick="showForm('signup')">Sign Up</button>
+        <button class="toggle-btn" id="btn-login" onclick="showForm('login')">Login</button>
+        <button class="toggle-btn" id="btn-search" onclick="showForm('search')">Room Search</button>
+    </div>
+
+    <!-- Signup Form -->
+    <div class="form-container" id="form-signup">
+        <form onsubmit="handleSignup(event)">
+            <div class="form-group">
+                <label for="signup-fullname">Full Name</label>
+                <input type="text" id="signup-fullname" placeholder="John Doe">
+            </div>
+            <div class="form-group">
+                <label for="signup-email">Email</label>
+                <input type="text" id="signup-email" placeholder="username@aucegypt.edu">
+            </div>
+            <div class="form-group">
+                <label for="signup-password">Password</label>
+                <input type="password" id="signup-password" placeholder="More than 8 characters">
+            </div>
+            <div class="form-group">
+                <label for="signup-confirm">Confirm Password</label>
+                <input type="password" id="signup-confirm" placeholder="Repeat your password">
+            </div>
+            <div class="form-group">
+                <label for="signup-role">Role</label>
+                <select id="signup-role">
+                    <option value="">-- Select Role --</option>
+                    <option value="student">Student</option>
+                    <option value="ta">TA</option>
+                </select>
+            </div>
+            <button type="submit">Create Account</button>
+        </form>
+    </div>
+
+    <!-- Login Form -->
+    <div class="form-container hidden" id="form-login">
+        <form onsubmit="handleLogin(event)">
+            <div class="form-group">
+                <label for="login-email">Email</label>
+                <input type="text" id="login-email" placeholder="username@aucegypt.edu">
+            </div>
+            <div class="form-group">
+                <label for="login-password">Password</label>
+                <input type="password" id="login-password" placeholder="Enter your password">
+            </div>
+            <button type="submit">Login</button>
+        </form>
+    </div>
+
+    <!-- Room Search Form -->
+    <div class="form-container hidden" id="form-search">
+        <form onsubmit="handleSearch(event)">
+            <div class="form-group">
+                <label for="search-capacity">Capacity</label>
+                <input type="number" id="search-capacity" placeholder="Enter capacity (1-30)">
+            </div>
+            <div class="form-group">
+                <label>Technologies Required</label>
+                <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 8px;">
+                    <label style="display: flex; align-items: center; gap: 8px; color: #e0e0e0; font-size: 0.95rem; text-transform: none; letter-spacing: 0;"><input type="checkbox" value="4k display" class="tech-cb" style="width:auto; margin:0;"> 4K Display</label>
+                    <label style="display: flex; align-items: center; gap: 8px; color: #e0e0e0; font-size: 0.95rem; text-transform: none; letter-spacing: 0;"><input type="checkbox" value="whiteboards" class="tech-cb" style="width:auto; margin:0;"> Whiteboards</label>
+                    <label style="display: flex; align-items: center; gap: 8px; color: #e0e0e0; font-size: 0.95rem; text-transform: none; letter-spacing: 0;"><input type="checkbox" value="projector" class="tech-cb" style="width:auto; margin:0;"> Projector (Single)</label>
+                    <label style="display: flex; align-items: center; gap: 8px; color: #e0e0e0; font-size: 0.95rem; text-transform: none; letter-spacing: 0;"><input type="checkbox" value="projectors" class="tech-cb" style="width:auto; margin:0;"> Projectors (Multiple)</label>
+                    <label style="display: flex; align-items: center; gap: 8px; color: #e0e0e0; font-size: 0.95rem; text-transform: none; letter-spacing: 0;"><input type="checkbox" value="video conf." class="tech-cb" style="width:auto; margin:0;"> Video Conf.</label>
+                </div>
+            </div>
+            <button type="submit">Search Rooms</button>
+        </form>
+    </div>
+
+    <!-- Response Display -->
+    <div class="response-container">
+        <p class="response-label">Server Response</p>
+        <div class="response-box" id="response">Waiting for a request...</div>
+    </div>
+
+    <script>
+        const AUTH_API = 'http://localhost:3000/api/auth';
+        const ROOMS_API = 'http://localhost:3000/api/rooms';
+
+        function showForm(type) {
+            document.getElementById('form-signup').classList.toggle('hidden', type !== 'signup');
+            document.getElementById('form-login').classList.toggle('hidden', type !== 'login');
+            document.getElementById('form-search').classList.toggle('hidden', type !== 'search');
+            document.getElementById('btn-signup').classList.toggle('active', type === 'signup');
+            document.getElementById('btn-login').classList.toggle('active', type === 'login');
+            document.getElementById('btn-search').classList.toggle('active', type === 'search');
+        }
+
+        function displayResponse(status, data) {
+            const box = document.getElementById('response');
+            const isSuccess = status >= 200 && status < 300;
+
+            box.className = 'response-box ' + (isSuccess ? 'success' : 'error');
+            box.innerHTML = `<span class="status-badge s${status}">HTTP ${status}</span>\n${JSON.stringify(data, null, 2)}`;
+        }
+
+        async function handleSignup(e) {
+            e.preventDefault();
+            const body = {
+                fullName: document.getElementById('signup-fullname').value,
+                email: document.getElementById('signup-email').value,
+                password: document.getElementById('signup-password').value,
+                confirmPassword: document.getElementById('signup-confirm').value,
+                role: document.getElementById('signup-role').value
+            };
+
+            try {
+                const res = await fetch(`${AUTH_API}/signup`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+                const data = await res.json();
+                displayResponse(res.status, data);
+            } catch (err) {
+                displayResponse(500, { error: 'Could not connect to server. Is it running?' });
+            }
+        }
+
+        async function handleLogin(e) {
+            e.preventDefault();
+            const body = {
+                email: document.getElementById('login-email').value,
+                password: document.getElementById('login-password').value
+            };
+
+            try {
+                const res = await fetch(`${AUTH_API}/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+                const data = await res.json();
+                displayResponse(res.status, data);
+            } catch (err) {
+                displayResponse(500, { error: 'Could not connect to server. Is it running?' });
+            }
+        }
+
+        async function handleSearch(e) {
+            e.preventDefault();
+            
+            const checkboxes = document.querySelectorAll('.tech-cb:checked');
+            const technologies = Array.from(checkboxes).map(cb => cb.value);
+
+            const body = {
+                capacity: document.getElementById('search-capacity').value,
+                technologies: technologies
+            };
+
+            try {
+                const res = await fetch(`${ROOMS_API}/search`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+                const data = await res.json();
+                displayResponse(res.status, data);
+            } catch (err) {
+                displayResponse(500, { error: 'Could not connect to server. Is it running?' });
+            }
+        }
+    </script>
+
+</body>
+</html>
