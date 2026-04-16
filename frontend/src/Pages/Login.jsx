@@ -1,23 +1,67 @@
 import { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import "../App.css";
 import AUC from "../assets/AUC.jpg";
 
 function Login() {
-  const [role, setRole] = useState("student");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
 
-  const handleSubmit = (e) => {
+  const navigate = useNavigate();
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log({ role, email, password });
+
+    setError("");
+    setSuccess("");
+
+    try {
+      const response = await fetch("http://localhost:3000/api/auth/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email,
+          password,
+        }),
+      });
+
+      const data = await response.json();
+
+/*if (!response.ok) {
+  if (!email.trim() || !password.trim()) {
+    setError("Validation failed.");
+  } else {
+    setError("Invalid email or password.");
+  }
+  return;
+}*/
+if (!response.ok) {
+  setError(data.message);
+  return;
+}
+      setSuccess("Login successful!");
+      localStorage.setItem("user", JSON.stringify(data.user));
+
+      setTimeout(() => {
+        navigate("/home");
+      }, 1000);
+    } catch (error) {
+      console.error("Login error:", error);
+      setError("Server error. Please try again.");
+    }
   };
 
   return (
     <div className="login-page">
-<div
-  className="login-left"
-  style={{ backgroundImage: `url(${AUC})` }}
->        <div className="overlay">
+      <div
+        className="login-left"
+        style={{ backgroundImage: `url(${AUC})` }}
+      >
+        <div className="overlay">
           <div className="left-content">
             <h1>
               AUC booking
@@ -26,8 +70,8 @@ function Login() {
             </h1>
 
             <p>
-              Reserve your study space, connect with others, 
-              and stay organized throughout your academic journey.
+              Reserve your study space, connect with others, and stay organized
+              throughout your academic journey.
             </p>
           </div>
         </div>
@@ -37,35 +81,14 @@ function Login() {
         <div className="form-box">
           <h2>Welcome Back</h2>
           <p className="subtitle">
-            Select your current role and enter your credentials to access the
-            booking portal.
+            Enter your credentials to access the booking portal.
           </p>
-
-          <p className="section-label">I AM LOGGING IN AS</p>
-
-          <div className="role-buttons">
-            <button
-              type="button"
-              className={role === "student" ? "role-card active" : "role-card"}
-              onClick={() => setRole("student")}
-            >
-              Student
-            </button>
-
-            <button
-              type="button"
-              className={role === "ta" ? "role-card active" : "role-card"}
-              onClick={() => setRole("ta")}
-            >
-              Graduate TA
-            </button>
-          </div>
 
           <form onSubmit={handleSubmit}>
             <label>Email Address</label>
             <input
               type="email"
-              placeholder="alex.rivers@university.edu"
+              placeholder="name@aucegypt.edu"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
             />
@@ -82,14 +105,17 @@ function Login() {
               onChange={(e) => setPassword(e.target.value)}
             />
 
+            {error && <p className="error-msg">{error}</p>}
+            {success && <p className="success-msg">{success}</p>}
+
             <button type="submit" className="login-btn">
               Log In
             </button>
           </form>
 
           <p className="signup-text">
-            New here? <a href="/">Create an institutional account</a>
-          </p>
+            New here? <Link to="/signup">Create an institutional account</Link>
+            </p>
 
           <div className="footer-links">
             <a href="/">Privacy Policy</a>
