@@ -35,6 +35,26 @@ function Search() {
   }, []);
   // --- REAL DATA LOGIC END ---
 
+  const [activeTab, setActiveTab] = useState("Search");
+  const [myBookings, setMyBookings] = useState([]);
+
+  useEffect(() => {
+    if (activeTab === "My Bookings") {
+       const savedUser = localStorage.getItem("user");
+       if (savedUser) {
+          const userObj = JSON.parse(savedUser);
+          fetch(`http://localhost:3000/api/bookings/my-bookings/${userObj.id}`)
+            .then(res => res.json())
+            .then(data => {
+               if (data.success) {
+                   setMyBookings(data.bookings);
+               }
+            })
+            .catch(err => console.error("My Bookings fetch error", err));
+       }
+    }
+  }, [activeTab]);
+
   const [searchText, setSearchText] = useState("");
   const [capacity, setCapacity] = useState(4);
   const [role, setRole] = useState("Student");
@@ -118,8 +138,8 @@ function Search() {
         </div>
 
         <nav className="search-sidebar-menu">
-          <button className="search-menu-item active">Search</button>
-          <button className="search-menu-item">My Bookings</button>
+          <button className={`search-menu-item ${activeTab === 'Search' ? 'active' : ''}`} onClick={() => setActiveTab('Search')}>Search</button>
+          <button className={`search-menu-item ${activeTab === 'My Bookings' ? 'active' : ''}`} onClick={() => setActiveTab('My Bookings')}>My Bookings</button>
           <button className="search-menu-item">Public Rooms</button>
           <button className="search-menu-item">Profile</button>
         </nav>
@@ -128,18 +148,20 @@ function Search() {
       </aside>
 
       <main className="search-main">
-        <div className="search-top-bar">
-          <h1>Search Results</h1>
-          <input
-            type="text"
-            placeholder="Quick search..."
-            value={searchText}
-            onChange={(e) => setSearchText(e.target.value)}
-            className="search-quick-input"
-          />
-        </div>
+        {activeTab === "Search" && (
+          <>
+            <div className="search-top-bar">
+              <h1>Search Results</h1>
+              <input
+                type="text"
+                placeholder="Quick search..."
+                value={searchText}
+                onChange={(e) => setSearchText(e.target.value)}
+                className="search-quick-input"
+              />
+            </div>
 
-        <div className="search-layout">
+            <div className="search-layout">
           <section className="search-filters-panel">
             <div className="search-card">
               <h3>Refine Search</h3>
@@ -299,8 +321,41 @@ function Search() {
                 ))}
               </div>
             </div>
-          </section>
-        </div>
+            </section>
+          </div>
+        </>
+        )}
+        
+        {activeTab === "My Bookings" && (
+          <div className="my-bookings-container" style={{ padding: "20px" }}>
+            <h1 style={{ marginBottom: "20px", fontSize: "2rem", color: "#1e293b" }}>My Registered Rooms</h1>
+            <div className="search-rooms-grid">
+              {myBookings.length > 0 ? (
+                myBookings.map((b) => (
+                  <div className="search-room-card" key={b.id || Math.random()}>
+                    <div className="search-room-top">
+                      <span className="search-status-badge" style={{ backgroundColor: "#3b82f6", color: "white" }}>Confirmed</span>
+                    </div>
+
+                    <h3>Room {b.roomName}</h3>
+                    <p className="search-room-location">Date: {b.date}</p>
+                    <p className="search-room-location">Time: {b.startTime} — {b.endTime}</p>
+
+                    <div className="search-room-features" style={{ marginTop: "15px" }}>
+                      <span>Cap: {b.roomCapacity}</span>
+                      <span style={{ marginLeft: "10px" }}>Tech: {b.roomTechnology}</span>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="search-empty-state">
+                  <h3>No bookings found</h3>
+                  <p>You haven't registered any rooms yet.</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </main>
     </div>
   );
