@@ -1,22 +1,32 @@
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const sequelize = require('./config/database');
 
-// Import all route modules
-const authRoutes = require('./routes/auth');
-const roomRoutes = require('./routes/rooms');
+// Import your modular routes
 const bookingRoutes = require('./routes/bookings');
+const authRoutes = require('./routes/auth'); // If you've moved Radwa's here
+const roomRoutes = require('./routes/rooms'); // If you've moved Radwa's here
 
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 
 app.use(cors());
 app.use(express.json());
 
-// --- CONNECT ROUTES ---
-app.use('/api/auth', authRoutes);         // Radwa's Login/Signup
-app.use('/api/rooms', roomRoutes);        // Radwa's Search
-app.use('/api/bookings', bookingRoutes);  // Omar's Tasks 7 & 9
+// Routes
+app.use('/api/bookings', bookingRoutes);
+app.use('/api/auth', authRoutes);
+app.use('/api/rooms', roomRoutes);
 
-app.listen(PORT, () => {
-    console.log(`🚀 Full Modular Server running on http://localhost:${PORT}`);
-});
+// Database Sync & Start
+sequelize.sync()
+    .then(() => {
+        console.log('✅ PostgreSQL Connected & Synced (Supabase)');
+        app.listen(PORT, () => {
+            console.log(`🚀 Server running on http://localhost:${PORT}`);
+        });
+    })
+    .catch(err => {
+        console.error('❌ Database Sync Error:', err);
+    });
