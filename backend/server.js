@@ -3,10 +3,10 @@ const express = require('express');
 const cors = require('cors');
 const sequelize = require('./config/database');
 
-// Import your modular routes
+// Import modular routes
+const authRoutes = require('./routes/auth');
+const roomRoutes = require('./routes/rooms');
 const bookingRoutes = require('./routes/bookings');
-const authRoutes = require('./routes/auth'); // If you've moved Radwa's here
-const roomRoutes = require('./routes/rooms'); // If you've moved Radwa's here
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -14,12 +14,12 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
-// Routes
-app.use('/api/bookings', bookingRoutes);
+// --- CONNECT ROUTES ---
 app.use('/api/auth', authRoutes);
 app.use('/api/rooms', roomRoutes);
+app.use('/api/bookings', bookingRoutes);
 
-// Database Sync & Start
+// Sync Database and Start
 sequelize.sync()
     .then(() => {
         console.log('✅ PostgreSQL Connected & Synced (Supabase)');
