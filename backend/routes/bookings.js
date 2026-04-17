@@ -1,6 +1,8 @@
 const express = require('express');
 const router = express.Router();
-const Booking = require('../models/Booking'); // We will create this model next
+const Booking = require('../models/Booking');
+const sequelize = require('../config/database');
+const { QueryTypes } = require('sequelize');
 
 // JIRA TASK #7: Create Booking in DB
 router.post('/', async (req, res) => {
@@ -74,18 +76,35 @@ router.get('/my-bookings/:userId', async (req, res) => {
     try {
         const userId = parseInt(req.params.userId);
         
-        // Find all in DB where userID matches
-        const userBookings = await Booking.findAll({
-            where: { userID: userId },
-            order: [['startTime', 'ASC']] // AC: Sorted chronologically
+        const sqlString = `
+            SELECT 
+                b.booking_id as "id", 
+                b.start_time as "startTime", 
+                b.end_time as "endTime", 
+                b.date as "date", 
+                b.status as "status",
+                r.id as "roomId",
+                r.room_name as "roomName", 
+                r.capacity as "roomCapacity", 
+                r.technology as "roomTechnology"
+            FROM bookings b
+            JOIN rooms r ON b.room_id = r.id
+            WHERE b.user_id = :userId
+            ORDER BY b.date DESC, b.start_time ASC
+        `;
+
+        const userBookingsDetailed = await sequelize.query(sqlString, {
+            replacements: { userId },
+            type: QueryTypes.SELECT
         });
         
-        if (userBookings.length === 0) {
+        if (!userBookingsDetailed || userBookingsDetailed.length === 0) {
             return res.status(200).json({ message: "No bookings yet.", bookings: [] });
         }
 
-        res.status(200).json({ success: true, bookings: userBookings });
+        res.status(200).json({ success: true, bookings: userBookingsDetailed });
     } catch (err) {
+        console.error("Fetch bindings error: ", err);
         res.status(500).json({ error: "Failed to fetch from PostgreSQL" });
     }
 });
