@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
-const Booking = require('../models/Booking');
-const sequelize = require('../config/database');
+const Booking = require('../models/Booking'); 
+const sequelize = require('../config/database'); 
 const { QueryTypes } = require('sequelize');
 
 // JIRA TASK #7: Create Booking in DB
@@ -45,7 +45,7 @@ router.post('/', async (req, res) => {
 
         const hasConflict = existingBookings.some(b => {
             const bStart = parseInt(b.startTime.split(':')[0], 10);
-            const bEnd = parseInt(b.endTime.split(':')[0], 10);
+            const bEnd = b.endTime ? parseInt(b.endTime.split(':')[0], 10) : (bStart + 1);
             // Overlap condition: newStart < existingEnd AND newEnd > existingStart
             return startHour < bEnd && endHour > bStart;
         });
@@ -74,37 +74,33 @@ router.post('/', async (req, res) => {
 // JIRA TASK #9: View My Bookings from DB
 router.get('/my-bookings/:userId', async (req, res) => {
     try {
-        const userId = parseInt(req.params.userId);
+        const userId = parseInt(req.params.userId, 10);
         
+        // THIS IS THE SQL QUERY YOU ASKED ABOUT!
         const sqlString = `
             SELECT 
-                b.booking_id as "id", 
-                b.start_time as "startTime", 
-                b.end_time as "endTime", 
-                b.date as "date", 
-                b.status as "status",
-                r.id as "roomId",
-                r.room_name as "roomName", 
-                r.capacity as "roomCapacity", 
-                r.technology as "roomTechnology"
+                b.booking_id, 
+                b.start_time, 
+                b.end_time,
+                b.date, 
+                b.status, 
+                r.room_name, 
+                r.technology,
+                r.capacity   -- <-- Here is the capacity added!
             FROM bookings b
             JOIN rooms r ON b.room_id = r.id
             WHERE b.user_id = :userId
-            ORDER BY b.date DESC, b.start_time ASC
+            ORDER BY b.date ASC, b.start_time ASC
         `;
 
-        const userBookingsDetailed = await sequelize.query(sqlString, {
-            replacements: { userId },
+        const userBookings = await sequelize.query(sqlString, {
+            replacements: { userId: userId },
             type: QueryTypes.SELECT
         });
         
-        if (!userBookingsDetailed || userBookingsDetailed.length === 0) {
-            return res.status(200).json({ message: "No bookings yet.", bookings: [] });
-        }
-
-        res.status(200).json({ success: true, bookings: userBookingsDetailed });
+        res.status(200).json({ success: true, bookings: userBookings });
     } catch (err) {
-        console.error("Fetch bindings error: ", err);
+        console.error("Fetch error:", err);
         res.status(500).json({ error: "Failed to fetch from PostgreSQL" });
     }
 });
