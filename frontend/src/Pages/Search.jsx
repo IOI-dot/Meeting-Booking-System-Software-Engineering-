@@ -1,59 +1,40 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react"; // Added useEffect
 import "../App.css";
 
 function Search() {
-  const roomsData = [
-    {
-      id: 1,
-      name: "Conference Room 402",
-      location: "Science Block · Level 3",
-      capacity: 12,
-      features: ["4K Display", "Video Hub"],
-      availability: "08:00 — 20:00",
-      slot: "Select 2h Slot",
-      status: "Available Now",
-    },
-    {
-      id: 2,
-      name: "The Da Vinci Studio",
-      location: "Arts Pavilion · Level 1",
-      capacity: 6,
-      features: ["4K Display", "Drawing Wall"],
-      availability: "08:00 — 20:00",
-      slot: "Select 1h Slot",
-      status: "Available Now",
-    },
-    {
-      id: 3,
-      name: "Main Library 402",
-      location: "Library Wing · 5 min walk",
-      capacity: 10,
-      features: ["Projector", "Whiteboards"],
-      availability: "09:00 — 18:00",
-      slot: "Select 1h Slot",
-      status: "Available",
-    },
-    {
-      id: 4,
-      name: "The Hive Pod 09",
-      location: "Student Union · 8 min walk",
-      capacity: 4,
-      features: ["Dual Monitor"],
-      availability: "10:00 — 16:00",
-      slot: "Select 30m Slot",
-      status: "Available",
-    },
-  ];
+  // --- REAL DATA LOGIC START ---
+  const [rooms, setRooms] = useState([]); // This replaces the fake roomsData array
+  const [loading, setLoading] = useState(true);
+
+  // Generate 24 hours for the real timeline
+  const hoursOfDay = Array.from({ length: 24 }, (_, i) => {
+    return `${i.toString().padStart(2, "0")}:00`;
+  });
+
+  useEffect(() => {
+    // Fetch from your PostgreSQL backend
+    fetch("http://localhost:3000/api/timeline")
+      .then((res) => res.json())
+      .then((data) => {
+        setRooms(data);
+        setLoading(false);
+      })
+      .catch((err) => {
+        console.error("Error fetching rooms:", err);
+        setLoading(false);
+      });
+  }, []);
+  // --- REAL DATA LOGIC END ---
 
   const [searchText, setSearchText] = useState("");
   const [capacity, setCapacity] = useState(4);
   const [role, setRole] = useState("Student");
   const [filters, setFilters] = useState({
-    display4k: true,
-    whiteboards: false,
-    projector: false,
-    videoConf: true,
-  });
+  display4k: false,    // Change to false
+  whiteboards: false,
+  projector: false,
+  videoConf: false,    // Change to false
+});
 
   const usedHours = 2.5;
   const dailyQuota = 4.0;
@@ -74,23 +55,26 @@ function Search() {
     return list;
   }, [filters]);
 
+  // Updated to use the REAL 'rooms' state from database
   const filteredRooms = useMemo(() => {
-    return roomsData.filter((room) => {
+    return rooms.filter((room) => {
       const matchesSearch =
-        room.name.toLowerCase().includes(searchText.toLowerCase()) ||
-        room.location.toLowerCase().includes(searchText.toLowerCase());
+        room.room_name.toLowerCase().includes(searchText.toLowerCase());
 
       const matchesCapacity = room.capacity >= Number(capacity);
 
+      // Simple check for technology tags
       const matchesFeatures =
         activeFeatures.length === 0 ||
-        activeFeatures.every((feature) => room.features.includes(feature));
+        activeFeatures.every((feature) => 
+          (room.technology || "").toLowerCase().includes(feature.toLowerCase().split(' ')[0])
+        );
 
       return matchesSearch && matchesCapacity && matchesFeatures;
     });
-  }, [searchText, capacity, activeFeatures]);
+  }, [rooms, searchText, capacity, activeFeatures]);
 
-  const suggestions = roomsData.filter((room) => {
+  const suggestions = rooms.filter((room) => {
     return (
       room.capacity >= Number(capacity) &&
       !filteredRooms.some((matchedRoom) => matchedRoom.id === room.id)
@@ -148,80 +132,32 @@ function Search() {
               <div className="search-role-buttons">
                 <button
                   type="button"
-                  className={
-                    role === "Student"
-                      ? "search-role-btn active-role"
-                      : "search-role-btn"
-                  }
+                  className={role === "Student" ? "search-role-btn active-role" : "search-role-btn"}
                   onClick={() => setRole("Student")}
                 >
                   Student
                 </button>
                 <button
                   type="button"
-                  className={
-                    role === "TA / Faculty"
-                      ? "search-role-btn active-role"
-                      : "search-role-btn"
-                  }
+                  className={role === "TA / Faculty" ? "search-role-btn active-role" : "search-role-btn"}
                   onClick={() => setRole("TA / Faculty")}
                 >
                   TA / Faculty
                 </button>
               </div>
 
-              <label className="search-filter-label">
-                Technology Requirements
-              </label>
+              <label className="search-filter-label">Technology Requirements</label>
               <div className="search-checkbox-list">
-                <label>
-                  <input
-                    type="checkbox"
-                    checked={filters.display4k}
-                    onChange={() => toggleFilter("display4k")}
-                  />
-                  4K Display
-                </label>
-
-                <label>
-                  <input
-                    type="checkbox"
-                    checked={filters.whiteboards}
-                    onChange={() => toggleFilter("whiteboards")}
-                  />
-                  Whiteboards
-                </label>
-
-                <label>
-                  <input
-                    type="checkbox"
-                    checked={filters.projector}
-                    onChange={() => toggleFilter("projector")}
-                  />
-                  Projector
-                </label>
-
-                <label>
-                  <input
-                    type="checkbox"
-                    checked={filters.videoConf}
-                    onChange={() => toggleFilter("videoConf")}
-                  />
-                  Video Conf.
-                </label>
+                <label><input type="checkbox" checked={filters.display4k} onChange={() => toggleFilter("display4k")} /> 4K Display</label>
+                <label><input type="checkbox" checked={filters.whiteboards} onChange={() => toggleFilter("whiteboards")} /> Whiteboards</label>
+                <label><input type="checkbox" checked={filters.projector} onChange={() => toggleFilter("projector")} /> Projector</label>
+                <label><input type="checkbox" checked={filters.videoConf} onChange={() => toggleFilter("videoConf")} /> Video Conf.</label>
               </div>
 
               <button
                 type="button"
                 className="search-reset-btn"
-                onClick={() =>
-                  setFilters({
-                    display4k: false,
-                    whiteboards: false,
-                    projector: false,
-                    videoConf: false,
-                  })
-                }
+                onClick={() => setFilters({ display4k: false, whiteboards: false, projector: false, videoConf: false })}
               >
                 Reset All Filters
               </button>
@@ -229,15 +165,9 @@ function Search() {
 
             <div className="search-card search-quota-card">
               <h4>Fair Use Limit</h4>
-              <p>
-                You have used <strong>{usedHours} / {dailyQuota} hours</strong>{" "}
-                of your daily booking quota.
-              </p>
+              <p>You have used <strong>{usedHours} / {dailyQuota} hours</strong> of your daily booking quota.</p>
               <div className="search-progress-bar">
-                <div
-                  className="search-progress-fill"
-                  style={{ width: `${(usedHours / dailyQuota) * 100}%` }}
-                ></div>
+                <div className="search-progress-fill" style={{ width: `${(usedHours / dailyQuota) * 100}%` }}></div>
               </div>
             </div>
           </section>
@@ -246,55 +176,56 @@ function Search() {
             <div className="search-results-header">
               <div>
                 <h2>Available Spaces</h2>
-                <p>
-                  Found <strong>{filteredRooms.length}</strong> rooms matching
-                  your exact criteria.
-                </p>
+                <p>Found <strong>{filteredRooms.length}</strong> rooms matching your exact criteria.</p>
               </div>
 
               <div className="search-active-tags">
                 {activeFeatures.map((feature, index) => (
-                  <span key={index} className="search-filter-tag">
-                    {feature}
-                  </span>
+                  <span key={index} className="search-filter-tag">{feature}</span>
                 ))}
               </div>
             </div>
 
             <div className="search-rooms-grid">
-              {filteredRooms.length > 0 ? (
+              {loading ? <p>Loading Database...</p> : filteredRooms.length > 0 ? (
                 filteredRooms.map((room) => (
                   <div className="search-room-card" key={room.id}>
                     <div className="search-room-top">
-                      <span className="search-status-badge">{room.status}</span>
+                      <span className="search-status-badge">Available Now</span>
                     </div>
 
-                    <h3>{room.name}</h3>
-                    <p className="search-room-location">{room.location}</p>
+                    <h3>{room.room_name}</h3>
+                    <p className="search-room-location">AUC Campus · {room.technology}</p>
 
                     <div className="search-room-features">
                       <span>Cap: {room.capacity}</span>
-                      {room.features.map((feature, index) => (
-                        <span key={index}>{feature}</span>
-                      ))}
                     </div>
 
                     <div className="search-availability-section">
                       <div className="search-availability-head">
-                        <span>Today’s Availability</span>
-                        <span>{room.availability}</span>
+                        <span>24-Hour Timeline</span>
+                        <span>00:00 — 23:00</span>
                       </div>
 
-                      <div className="search-timeline">
-                        <div className="search-timeline-bar"></div>
-                        <div className="search-timeline-slot slot1"></div>
-                        <div className="search-timeline-slot slot2"></div>
+                      {/* --- FIX: INSERTING THE REAL TIMELINE BAR --- */}
+                      <div className="search-timeline" style={{ height: "20px", display: "flex", gap: "1px", background: "#eee", borderRadius: "4px", overflow: "hidden" }}>
+                        {hoursOfDay.map((hour) => {
+                           const currentHourNum = parseInt(hour.split(":")[0], 10);
+                           const booking = room.bookings?.find(b => parseInt(b.start_hour, 10) === currentHourNum);
+                           const isBooked = !!booking;
+                           return (
+                             <div 
+                               key={hour} 
+                               title={isBooked ? `Booked at ${hour}` : `Free at ${hour}`}
+                               style={{ flex: 1, backgroundColor: isBooked ? "#dc2626" : "#16a34a" }} 
+                             />
+                           );
+                        })}
                       </div>
+                      {/* --- END FIX --- */}
                     </div>
 
-                    <button type="button" className="search-slot-btn">
-                      {room.slot}
-                    </button>
+                    <button type="button" className="search-slot-btn">Book Now</button>
                   </div>
                 ))
               ) : (
@@ -305,26 +236,19 @@ function Search() {
               )}
             </div>
 
+            {/* Suggestions section kept exactly as requested */}
             <div className="search-suggestion-box">
               <h3>Exhausted Exact Matches</h3>
-              <p>
-                No rooms match your specific{" "}
-                <strong>Technology Requirements</strong>. We found nearby
-                alternatives for you.
-              </p>
-
+              <p>No rooms match your specific <strong>Technology Requirements</strong>. We found nearby alternatives for you.</p>
               <div className="search-suggested-grid">
                 {suggestions.slice(0, 2).map((room) => (
                   <div className="search-suggested-card" key={room.id}>
                     <div className="search-suggested-image"></div>
                     <div>
-                      <h4>{room.name}</h4>
-                      <p>{room.location}</p>
+                      <h4>{room.room_name}</h4>
+                      <p>Capacity: {room.capacity}</p>
                       <div className="search-mini-tags">
-                        {room.features.map((feature, index) => (
-                          <span key={index}>{feature}</span>
-                        ))}
-                        <span>Cap: {room.capacity}</span>
+                        <span>{room.technology}</span>
                       </div>
                     </div>
                   </div>
