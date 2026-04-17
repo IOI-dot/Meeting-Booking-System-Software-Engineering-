@@ -20,6 +20,7 @@ router.get('/', async (req, res) => {
                     json_agg(
                         json_build_object(
                             'start_hour', b.start_time, 
+                            'end_hour', b.end_time,
                             'status', b.status
                         )
                     ) FILTER (WHERE b.booking_id IS NOT NULL), '[]'

@@ -1,10 +1,12 @@
-import { useMemo, useState, useEffect } from "react"; // Added useEffect
+import { useMemo, useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import "../App.css";
 
 function Search() {
   // --- REAL DATA LOGIC START ---
-  const [rooms, setRooms] = useState([]); // This replaces the fake roomsData array
+  const [rooms, setRooms] = useState([]);
   const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
 
   // Generate 24 hours for the real timeline
   const hoursOfDay = Array.from({ length: 24 }, (_, i) => {
@@ -14,9 +16,16 @@ function Search() {
   useEffect(() => {
     // Fetch from your PostgreSQL backend
     fetch("http://localhost:3000/api/timeline")
-      .then((res) => res.json())
+      .then((res) => {
+        if (!res.ok) throw new Error("Backend error");
+        return res.json();
+      })
       .then((data) => {
-        setRooms(data);
+        if (Array.isArray(data)) {
+            setRooms(data);
+        } else {
+            setRooms([]);
+        }
         setLoading(false);
       })
       .catch((err) => {
@@ -30,14 +39,33 @@ function Search() {
   const [capacity, setCapacity] = useState(4);
   const [role, setRole] = useState("Student");
   const [filters, setFilters] = useState({
-  display4k: false,    // Change to false
-  whiteboards: false,
-  projector: false,
-  videoConf: false,    // Change to false
-});
+    display4k: false,
+    whiteboards: false,
+    projector: false,
+    videoConf: false,
+  });
 
-  const usedHours = 2.5;
+  const [usedHours, setUsedHours] = useState(0);
   const dailyQuota = 4.0;
+
+  useEffect(() => {
+    const savedUser = localStorage.getItem("user");
+    if (savedUser) {
+       const userObj = JSON.parse(savedUser);
+       // Simple local date to match database Date format
+       const tzoffset = (new Date()).getTimezoneOffset() * 60000;
+       const todayDate = (new Date(Date.now() - tzoffset)).toISOString().split('T')[0];
+       
+       fetch(`http://localhost:3000/api/bookings/quota/${userObj.id}/${todayDate}`)
+         .then(res => res.json())
+         .then(data => {
+            if (data.success) {
+                setUsedHours(data.usedHours);
+            }
+         })
+         .catch(err => console.error("Quota fetch error", err));
+    }
+  }, []);
 
   const toggleFilter = (key) => {
     setFilters((prev) => ({
@@ -165,9 +193,21 @@ function Search() {
 
             <div className="search-card search-quota-card">
               <h4>Fair Use Limit</h4>
-              <p>You have used <strong>{usedHours} / {dailyQuota} hours</strong> of your daily booking quota.</p>
-              <div className="search-progress-bar">
-                <div className="search-progress-fill" style={{ width: `${(usedHours / dailyQuota) * 100}%` }}></div>
+              {usedHours >= dailyQuota ? (
+                  <p style={{ color: "#dc2626", fontWeight: "bold" }}>You have reached the use limit for today.</p>
+              ) : (
+                  <p>You have used <strong>{usedHours} / {dailyQuota} hours</strong> of your daily booking quota.</p>
+              )}
+              <div className="search-progress-bar" style={{ backgroundColor: "#e2e8f0", overflow: "hidden", borderRadius: "8px" }}>
+                <div 
+                  className="search-progress-fill" 
+                  style={{ 
+                    width: `${Math.min((usedHours / dailyQuota) * 100, 100)}%`,
+                    backgroundColor: usedHours >= dailyQuota ? "#dc2626" : "#2563eb",
+                    height: "100%",
+                    transition: "all 0.5s ease"
+                  }}
+                ></div>
               </div>
             </div>
           </section>
@@ -211,7 +251,11 @@ function Search() {
                       <div className="search-timeline" style={{ height: "20px", display: "flex", gap: "1px", background: "#eee", borderRadius: "4px", overflow: "hidden" }}>
                         {hoursOfDay.map((hour) => {
                            const currentHourNum = parseInt(hour.split(":")[0], 10);
-                           const booking = room.bookings?.find(b => parseInt(b.start_hour, 10) === currentHourNum);
+                           const booking = room.bookings?.find(b => {
+                             const start = parseInt(b.start_hour, 10);
+                             const end = b.end_hour ? parseInt(b.end_hour, 10) : start + 1;
+                             return currentHourNum >= start && currentHourNum < end;
+                           });
                            const isBooked = !!booking;
                            return (
                              <div 
@@ -225,7 +269,7 @@ function Search() {
                       {/* --- END FIX --- */}
                     </div>
 
-                    <button type="button" className="search-slot-btn">Book Now</button>
+                    <button type="button" className="search-slot-btn" onClick={() => navigate(`/room/${room.id}/book`, { state: { room } })}>Book Now</button>
                   </div>
                 ))
               ) : (

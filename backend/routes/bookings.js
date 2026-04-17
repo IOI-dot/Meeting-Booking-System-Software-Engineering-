@@ -5,15 +5,60 @@ const Booking = require('../models/Booking'); // We will create this model next
 // JIRA TASK #7: Create Booking in DB
 router.post('/', async (req, res) => {
     try {
-        const { roomId, userId, timeSlot, date } = req.body;
+        const { roomId, userId, startTime, endTime, date } = req.body;
+
+        if (!roomId || !userId || !startTime || !endTime || !date) {
+            return res.status(400).json({ error: "Missing required fields" });
+        }
+
+        const startHour = parseInt(startTime.split(':')[0], 10);
+        const endHour = parseInt(endTime.split(':')[0], 10);
+
+        const durationRequested = endHour - startHour;
+
+        if (durationRequested > 4 || durationRequested <= 0) {
+            return res.status(400).json({ error: "Booking duration must be between 1 and 4 hours." });
+        }
+
+        // --- ENFORCE GLOBAL 4-HOUR DAILY LIMIT ---
+        const userDailyBookings = await Booking.findAll({
+            where: { userID: userId, date: date }
+        });
+
+        let hoursUsedToday = 0;
+        userDailyBookings.forEach(b => {
+             const h1 = parseInt(b.startTime.split(':')[0], 10);
+             const h2 = b.endTime ? parseInt(b.endTime.split(':')[0], 10) : (h1 + 1);
+             hoursUsedToday += (h2 - h1);
+        });
+
+        if (hoursUsedToday + durationRequested > 4) {
+             return res.status(400).json({ error: "Daily limit of 4 hours exceeded. You have already booked " + hoursUsedToday + " hours today." });
+        }
+
+        // Check for conflicts in this specific room
+        const existingBookings = await Booking.findAll({
+            where: { roomID: roomId, date: date }
+        });
+
+        const hasConflict = existingBookings.some(b => {
+            const bStart = parseInt(b.startTime.split(':')[0], 10);
+            const bEnd = parseInt(b.endTime.split(':')[0], 10);
+            // Overlap condition: newStart < existingEnd AND newEnd > existingStart
+            return startHour < bEnd && endHour > bStart;
+        });
+
+        if (hasConflict) {
+            return res.status(400).json({ error: "Time slot conflict with an existing booking." });
+        }
 
         // Create the record in PostgreSQL
         const newBooking = await Booking.create({
             roomID: roomId,
             userID: userId,
-            startTime: timeSlot, // Matches Milestone 2 naming
-            endTime: "1 hour later", // placeholder logic
-            date: date || "2026-04-15",
+            startTime, 
+            endTime, 
+            date,
             status: "Confirmed"
         });
 
@@ -42,6 +87,28 @@ router.get('/my-bookings/:userId', async (req, res) => {
         res.status(200).json({ success: true, bookings: userBookings });
     } catch (err) {
         res.status(500).json({ error: "Failed to fetch from PostgreSQL" });
+    }
+});
+
+// GET Daily Quota limits
+router.get('/quota/:userId/:date', async (req, res) => {
+    try {
+        const { userId, date } = req.params;
+        const userDailyBookings = await Booking.findAll({
+            where: { userID: parseInt(userId, 10), date: date }
+        });
+
+        let usedHours = 0;
+        userDailyBookings.forEach(b => {
+             const h1 = parseInt(b.startTime.split(':')[0], 10);
+             const h2 = b.endTime ? parseInt(b.endTime.split(':')[0], 10) : (h1 + 1);
+             usedHours += (h2 - h1);
+        });
+        
+        res.status(200).json({ success: true, usedHours, limit: 4 });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: "Failed to fetch quota" });
     }
 });
 
