@@ -7,7 +7,7 @@ const sequelize = require('./config/database');
 const authRoutes = require('./routes/auth');
 const roomRoutes = require('./routes/rooms');
 const bookingRoutes = require('./routes/bookings');
-const timelineRoutes = require('./routes/timeline'); // <-- 1. ADD THIS
+const timelineRoutes = require('./routes/timeline'); // Added from friend's push
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -19,7 +19,7 @@ app.use(express.json());
 app.use('/api/auth', authRoutes);
 app.use('/api/rooms', roomRoutes);
 app.use('/api/bookings', bookingRoutes);
-app.use('/api/timeline', timelineRoutes); // <-- 2. ADD THIS
+app.use('/api/timeline', timelineRoutes); // Added from friend's push
 
 // Sync Database and Start
 sequelize.sync()
