@@ -24,6 +24,11 @@ const Booking = sequelize.define('Booking', {
         allowNull: false,
         field: 'start_time'
     },
+    endTime: { 
+        type: DataTypes.STRING, 
+        allowNull: true,
+        field: 'end_time'
+    },
     date: { type: DataTypes.DATEONLY, allowNull: false },
     status: { type: DataTypes.STRING, defaultValue: 'Confirmed' }
 }, {
