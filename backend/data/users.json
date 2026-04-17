@@ -22,5 +22,21 @@
     "password": "$2b$10$qjcpQ9nEcbwIlZbil/yoOuriknDIpPaKRn4QQT/8Yz4GcGD.jOzzS",
     "role": "student",
     "createdAt": "2026-04-15T12:40:07.091Z"
+  },
+  {
+    "id": 4,
+    "fullName": "Basmala Metwally",
+    "email": "basmalametwally@aucegypt.edu",
+    "password": "$2b$10$na7xgpy1bGItDvrp7raDAezjuXDAC38mOO88l2bb6/TJxWukeBZZe", //BASMALA2020
+    "role": "student",
+    "createdAt": "2026-04-15T12:40:07.091Z"
+  },
+  {
+    "id": 5,
+    "fullName": "Amr Khaled",
+    "email": "amr_21@aucegypt.edu",
+    "password": "$2b$10$sVUkdZflup4jxXP/3mq7GuBn70iKWwYdr2KaQ7poZXxe5QjO1rITG", //AMR202561
+    "role": "student",
+    "createdAt": "2026-04-16T23:45:57.510Z"
   }
 ]
