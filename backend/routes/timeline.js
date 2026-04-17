@@ -3,11 +3,11 @@ const router = express.Router();
 const sequelize = require('../config/database'); 
 const { QueryTypes } = require('sequelize');
 
-// This will become GET /api/timeline
 router.get('/', async (req, res) => {
     try {
         const { capacity, hideBooked } = req.query;
 
+        // Use lowercase names that match the 'field' definitions in your models
         let sqlString = `
             SELECT 
                 r.id, 
@@ -19,11 +19,10 @@ router.get('/', async (req, res) => {
                 COALESCE(
                     json_agg(
                         json_build_object(
-                            'start_hour', b.start_hour, 
-                            'end_hour', b.end_hour, 
-                            'is_private', b.is_private
+                            'start_hour', b.start_time, 
+                            'status', b.status
                         )
-                    ) FILTER (WHERE b.id IS NOT NULL), '[]'
+                    ) FILTER (WHERE b.booking_id IS NOT NULL), '[]'
                 ) as bookings
             FROM rooms r
             LEFT JOIN bookings b ON r.id = b.room_id
@@ -41,7 +40,7 @@ router.get('/', async (req, res) => {
             sqlString += ` AND r.is_fully_booked = false`;
         }
 
-        sqlString += ` GROUP BY r.id`;
+        sqlString += ` GROUP BY r.id, r.room_name, r.capacity, r.technology, r.available_time_slots, r.is_fully_booked`;
 
         const rooms = await sequelize.query(sqlString, {
             replacements: replacements,
@@ -52,7 +51,7 @@ router.get('/', async (req, res) => {
 
     } catch (error) {
         console.error("Database error fetching timeline:", error);
-        res.status(500).json({ message: "Failed to fetch timeline data" });
+        res.status(500).json({ error: "Failed to fetch timeline" });
     }
 });
 
