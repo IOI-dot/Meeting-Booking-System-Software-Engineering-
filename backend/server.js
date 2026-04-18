@@ -7,7 +7,7 @@ const sequelize = require('./config/database');
 const authRoutes = require('./routes/auth');
 const roomRoutes = require('./routes/rooms');
 const bookingRoutes = require('./routes/bookings');
-const timelineRoutes = require('./routes/timeline');
+const timelineRoutes = require('./routes/timeline'); // Added from friend's push
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -15,15 +15,19 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
+// --- CONNECT ROUTES ---
 app.use('/api/auth', authRoutes);
 app.use('/api/rooms', roomRoutes);
 app.use('/api/bookings', bookingRoutes);
-app.use('/api/timeline', timelineRoutes);
+app.use('/api/timeline', timelineRoutes); // Added from friend's push
 
 // Sync Database and Start
-sequelize.sync()
+sequelize.sync({ alter: true })
     .then(() => {
-        console.log('Database synced successfully');
+        console.log('✅ PostgreSQL Connected & Synced (Supabase)');
+        app.listen(PORT, () => {
+            console.log(`🚀 Server running on http://localhost:${PORT}`);
+        });
     })
     .catch(err => {
         console.error('❌ Database Sync Error:', err);
