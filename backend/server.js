@@ -3,32 +3,34 @@ const express = require('express');
 const cors = require('cors');
 const sequelize = require('./config/database');
 
-// Import modular routes
 const authRoutes = require('./routes/auth');
 const roomRoutes = require('./routes/rooms');
 const bookingRoutes = require('./routes/bookings');
-const timelineRoutes = require('./routes/timeline'); // Added from friend's push
+const timelineRoutes = require('./routes/timeline');
 
 const app = express();
-const PORT = process.env.PORT || 3000;
 
+// 🔴 CHANGE THIS (we’ll fix CORS later after frontend deploy)
 app.use(cors());
 app.use(express.json());
 
-// --- CONNECT ROUTES ---
+// Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/rooms', roomRoutes);
 app.use('/api/bookings', bookingRoutes);
-app.use('/api/timeline', timelineRoutes); // Added from friend's push
+app.use('/api/timeline', timelineRoutes);
 
-// Sync Database and Start
-sequelize.sync({ alter: true })
-    .then(() => {
-        console.log('✅ PostgreSQL Connected & Synced (Supabase)');
-        app.listen(PORT, () => {
-            console.log(`🚀 Server running on http://localhost:${PORT}`);
-        });
-    })
-    .catch(err => {
-        console.error('❌ Database Sync Error:', err);
-    });
+// 🔴 IMPORTANT: REMOVE app.listen from production
+if (process.env.NODE_ENV !== 'production') {
+    sequelize.sync({ alter: true })
+        .then(() => {
+            console.log('DB connected locally');
+            app.listen(3000, () => {
+                console.log('Running locally');
+            });
+        })
+        .catch(err => console.error(err));
+}
+
+// 🔴 REQUIRED FOR VERCEL
+module.exports = app;
