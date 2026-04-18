@@ -12,7 +12,6 @@ const timelineRoutes = require('./routes/timeline'); // Added from friend's push
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-@@ -19,7 +19,7 @@
 app.use('/api/auth', authRoutes);
 app.use('/api/rooms', roomRoutes);
 app.use('/api/bookings', bookingRoutes);
