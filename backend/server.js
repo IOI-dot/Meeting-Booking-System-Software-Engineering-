@@ -14,23 +14,12 @@ const PORT = process.env.PORT || 3000;
 app.use('/api/auth', authRoutes);
 app.use('/api/rooms', roomRoutes);
 app.use('/api/bookings', bookingRoutes);
+
 app.use('/api/timeline', timelineRoutes); // Added from friend's push
 
 // Sync Database and Start
-// Sync Database and Start
-sequelize.sync({ alter: true })
-    .then(() => {
-        console.log('✅ PostgreSQL Connected & Synced (Supabase)');
-        // Only listen to port if running locally
-        if (process.env.NODE_ENV !== 'production') {
-            app.listen(PORT, () => {
-                console.log(`🚀 Server running on http://localhost:${PORT}`);
-            });
-        }
+sequelize.sync()
     })
     .catch(err => {
         console.error('❌ Database Sync Error:', err);
     });
-
-// THIS LINE IS REQUIRED FOR VERCEL
-module.exports = app;
