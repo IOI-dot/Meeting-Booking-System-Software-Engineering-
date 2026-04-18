@@ -47,7 +47,7 @@ if (!response.ok) {
       localStorage.setItem("user", JSON.stringify(data.user));
 
       setTimeout(() => {
-        navigate("/search");
+        navigate("/home");
       }, 1000);
     } catch (error) {
       console.error("Login error:", error);
