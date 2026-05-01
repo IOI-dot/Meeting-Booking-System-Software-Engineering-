@@ -26,7 +26,7 @@ router.get('/', async (req, res) => {
                     ) FILTER (WHERE b.booking_id IS NOT NULL), '[]'
                 ) as bookings
             FROM rooms r
-            LEFT JOIN bookings b ON r.id = b.room_id
+            LEFT JOIN bookings b ON r.id = b.room_id AND b.status = 'Confirmed'
             WHERE 1=1
         `;
         

@@ -24,7 +24,7 @@ router.post('/', async (req, res) => {
 
         // --- ENFORCE GLOBAL 4-HOUR DAILY LIMIT ---
         const userDailyBookings = await Booking.findAll({
-            where: { userID: userId, date: date }
+            where: { userID: userId, date: date, status: 'Confirmed' }
         });
 
         let hoursUsedToday = 0;
@@ -40,7 +40,7 @@ router.post('/', async (req, res) => {
 
         // Check for conflicts in this specific room
         const existingBookings = await Booking.findAll({
-            where: { roomID: roomId, date: date }
+            where: { roomID: roomId, date: date, status: 'Confirmed' }
         });
 
         const hasConflict = existingBookings.some(b => {
@@ -52,6 +52,17 @@ router.post('/', async (req, res) => {
 
         if (hasConflict) {
             return res.status(400).json({ error: "Time slot conflict with an existing booking." });
+        }
+
+        // --- PREVENT CROSS-ROOM OVERLAP FOR SAME USER ---
+        const userOverlap = userDailyBookings.some(b => {
+            const bStart = parseInt(b.startTime.split(':')[0], 10);
+            const bEnd = b.endTime ? parseInt(b.endTime.split(':')[0], 10) : (bStart + 1);
+            return startHour < bEnd && endHour > bStart;
+        });
+
+        if (userOverlap) {
+            return res.status(400).json({ error: "You already have a booking during this time slot. You cannot book two rooms at the same time." });
         }
 
         // Create the record in PostgreSQL
@@ -90,7 +101,7 @@ router.get('/my-bookings/:userId', async (req, res) => {
             FROM bookings b
             JOIN rooms r ON b.room_id = r.id
             WHERE b.user_id = :userId
-            ORDER BY b.date ASC, b.start_time ASC
+            ORDER BY b.booking_id DESC
         `;
 
         const userBookings = await sequelize.query(sqlString, {
@@ -110,7 +121,7 @@ router.get('/quota/:userId/:date', async (req, res) => {
     try {
         const { userId, date } = req.params;
         const userDailyBookings = await Booking.findAll({
-            where: { userID: parseInt(userId, 10), date: date }
+            where: { userID: parseInt(userId, 10), date: date, status: 'Confirmed' }
         });
 
         let usedHours = 0;
@@ -124,6 +135,55 @@ router.get('/quota/:userId/:date', async (req, res) => {
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: "Failed to fetch quota" });
+    }
+});
+
+// JIRA TASK #12: Cancel Booking (soft-cancel — status change preserves history)
+router.patch('/:bookingId/cancel', async (req, res) => {
+    try {
+        const bookingId = parseInt(req.params.bookingId, 10);
+        const { userId } = req.body;
+
+        if (!bookingId || isNaN(bookingId)) {
+            return res.status(400).json({ error: "Invalid booking ID." });
+        }
+
+        // Find the booking
+        const booking = await Booking.findByPk(bookingId);
+
+        if (!booking) {
+            return res.status(404).json({ error: "Booking not found." });
+        }
+
+        // Verify ownership
+        if (userId && booking.userID !== parseInt(userId, 10)) {
+            return res.status(403).json({ error: "You can only cancel your own bookings." });
+        }
+
+        // Prevent double-cancellation
+        if (booking.status === 'Cancelled') {
+            return res.status(400).json({ error: "This booking has already been cancelled." });
+        }
+
+        // Soft-cancel: change status to 'Cancelled' (retains data history)
+        booking.status = 'Cancelled';
+        await booking.save();
+
+        res.status(200).json({
+            success: true,
+            message: "Booking cancelled successfully. The time slot is now available for others.",
+            booking: {
+                id: booking.bookingID,
+                roomID: booking.roomID,
+                date: booking.date,
+                startTime: booking.startTime,
+                endTime: booking.endTime,
+                status: booking.status
+            }
+        });
+    } catch (err) {
+        console.error("Cancel booking error:", err);
+        res.status(500).json({ error: "Failed to cancel booking." });
     }
 });
 

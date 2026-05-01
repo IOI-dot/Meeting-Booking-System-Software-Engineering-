@@ -13,8 +13,8 @@ function Search() {
     return `${i.toString().padStart(2, "0")}:00`;
   });
 
-  useEffect(() => {
-    // Fetch from your PostgreSQL backend
+  const fetchRooms = () => {
+    setLoading(true);
     fetch("http://localhost:3000/api/timeline")
       .then((res) => {
         if (!res.ok) throw new Error("Backend error");
@@ -32,28 +32,73 @@ function Search() {
         console.error("Error fetching rooms:", err);
         setLoading(false);
       });
-  }, []);
-  // --- REAL DATA LOGIC END ---
+  };
 
   const [activeTab, setActiveTab] = useState("Search");
   const [myBookings, setMyBookings] = useState([]);
+  const [cancelModal, setCancelModal] = useState(null);   // holds booking object to cancel
+  const [cancellingId, setCancellingId] = useState(null);  // loading state
+  const [cancelSuccess, setCancelSuccess] = useState("");  // toast message
+
+  // Re-fetch timeline + quota every time the user switches to Search tab
+  useEffect(() => {
+    if (activeTab === "Search") {
+      fetchRooms();
+      fetchQuota();
+    }
+  }, [activeTab]);
+  // --- REAL DATA LOGIC END ---
+
+  const fetchMyBookings = () => {
+    const savedUser = localStorage.getItem("user");
+    if (savedUser) {
+       const userObj = JSON.parse(savedUser);
+       fetch(`http://localhost:3000/api/bookings/my-bookings/${userObj.id}`)
+         .then(res => res.json())
+         .then(data => {
+            if (data.success) {
+                setMyBookings(data.bookings);
+            }
+         })
+         .catch(err => console.error("My Bookings fetch error", err));
+    }
+  };
 
   useEffect(() => {
     if (activeTab === "My Bookings") {
-       const savedUser = localStorage.getItem("user");
-       if (savedUser) {
-          const userObj = JSON.parse(savedUser);
-          fetch(`http://localhost:3000/api/bookings/my-bookings/${userObj.id}`)
-            .then(res => res.json())
-            .then(data => {
-               if (data.success) {
-                   setMyBookings(data.bookings);
-               }
-            })
-            .catch(err => console.error("My Bookings fetch error", err));
-       }
+       fetchMyBookings();
     }
   }, [activeTab]);
+
+  // --- Cancel booking handler ---
+  const handleCancelBooking = async (booking) => {
+    const savedUser = localStorage.getItem("user");
+    const userObj = savedUser ? JSON.parse(savedUser) : null;
+    setCancellingId(booking.id);
+    try {
+      const res = await fetch(`http://localhost:3000/api/bookings/${booking.id}/cancel`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: userObj ? userObj.id : undefined })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setCancelSuccess(data.message);
+        fetchMyBookings();        // refresh the bookings list
+        fetchRooms();             // refresh timeline (cancelled slot → green)
+        fetchQuota();             // refresh fair-use bar
+        setTimeout(() => setCancelSuccess(""), 4000);
+      } else {
+        alert(data.error || "Cancellation failed.");
+      }
+    } catch (err) {
+      console.error("Cancel error:", err);
+      alert("Server error while cancelling.");
+    } finally {
+      setCancellingId(null);
+      setCancelModal(null);
+    }
+  };
 
   const [searchText, setSearchText] = useState("");
   const [capacity, setCapacity] = useState(4);
@@ -68,11 +113,10 @@ function Search() {
   const [usedHours, setUsedHours] = useState(0);
   const dailyQuota = 4.0;
 
-  useEffect(() => {
+  const fetchQuota = () => {
     const savedUser = localStorage.getItem("user");
     if (savedUser) {
        const userObj = JSON.parse(savedUser);
-       // Simple local date to match database Date format
        const tzoffset = (new Date()).getTimezoneOffset() * 60000;
        const todayDate = (new Date(Date.now() - tzoffset)).toISOString().split('T')[0];
        
@@ -85,6 +129,10 @@ function Search() {
          })
          .catch(err => console.error("Quota fetch error", err));
     }
+  };
+
+  useEffect(() => {
+    fetchQuota();
   }, []);
 
   const toggleFilter = (key) => {
@@ -327,49 +375,56 @@ function Search() {
         {/* THIS IS THE FIXED "MY BOOKINGS" BLOCK! */}
         {activeTab === "My Bookings" && (
           <div className="my-bookings-container" style={{ padding: "20px" }}>
-            <div className="search-top-bar" style={{ background: "none", boxShadow: "none", padding: "0", marginBottom: "25px" }}>
-              <h1 style={{ marginBottom: "5px", fontSize: "2rem", color: "#1e293b" }}>My Registered Rooms</h1>
-              <p style={{ color: "#64748b", margin: 0 }}>Review your upcoming reservations and explicit room details.</p>
-            </div>
-            
+            <h1 style={{ marginBottom: "20px", fontSize: "2rem", color: "#1e293b" }}>My Registered Rooms</h1>
+
+            {/* Cancellation success toast */}
+            {cancelSuccess && (
+              <div className="cancel-success-toast">
+                <span className="cancel-toast-icon">✓</span>
+                {cancelSuccess}
+              </div>
+            )}
+
             <div className="search-rooms-grid">
               {myBookings.length > 0 ? (
-                myBookings.map((b) => (
-                  <div className="search-room-card" key={b.booking_id || Math.random()} style={{ borderTop: "4px solid #3b82f6" }}>
-                    
-                    <div className="search-room-top" style={{ marginBottom: "15px" }}>
-                      <span className="search-status-badge" style={{ backgroundColor: "#dbeafe", color: "#1d4ed8", fontWeight: "bold", padding: "6px 12px" }}>
-                        {b.status || "Confirmed"}
-                      </span>
-                    </div>
+                myBookings.map((b) => {
+                  const isCancelled = b.status === "Cancelled";
+                  return (
+                    <div className={`search-room-card ${isCancelled ? "booking-cancelled" : ""}`} key={b.id || Math.random()}>
+                      <div className="search-room-top">
+                        <span
+                          className="search-status-badge"
+                          style={{
+                            backgroundColor: isCancelled ? "#94a3b8" : "#3b82f6",
+                            color: "white"
+                          }}
+                        >
+                          {isCancelled ? "Cancelled" : "Confirmed"}
+                        </span>
+                      </div>
 
-                    <h3 style={{ fontSize: "1.5rem", color: "#0f172a", marginBottom: "15px" }}>
-                      {b.room_name} {/* Fixed mapping */}
-                    </h3>
-                    
-                    <div style={{ backgroundColor: "#f8fafc", padding: "15px", borderRadius: "8px", border: "1px solid #e2e8f0", marginBottom: "20px" }}>
-                      <p style={{ margin: "0 0 10px 0", color: "#334155", fontSize: "0.95rem" }}>
-                        <strong style={{ color: "#0f172a" }}>📍 Building:</strong> AUC New Cairo Campus
-                      </p>
-                      <p style={{ margin: "0 0 10px 0", color: "#334155", fontSize: "0.95rem" }}>
-                        <strong style={{ color: "#0f172a" }}>📅 Date:</strong> {b.date}
-                      </p>
-                      <p style={{ margin: "0", color: "#334155", fontSize: "0.95rem" }}>
-                        <strong style={{ color: "#0f172a" }}>⏰ Time:</strong> {b.start_time} — {b.end_time || `${parseInt(b.start_time) + 1}:00`}
-                      </p>
-                    </div>
+                      <h3>Room {b.roomName}</h3>
+                      <p className="search-room-location">Date: {b.date}</p>
+                      <p className="search-room-location">Time: {b.startTime} — {b.endTime}</p>
 
-                    <div className="search-room-features" style={{ borderTop: "1px solid #e2e8f0", paddingTop: "15px", display: "flex", gap: "10px", flexWrap: "wrap" }}>
-                      <span style={{ backgroundColor: "#f1f5f9", padding: "6px 10px", borderRadius: "6px", fontSize: "0.85rem", color: "#475569" }}>
-                        👥 Cap: {b.capacity || "Max"} {/* Fixed mapping */}
-                      </span>
-                      <span style={{ backgroundColor: "#f1f5f9", padding: "6px 10px", borderRadius: "6px", fontSize: "0.85rem", color: "#475569" }}>
-                        💻 Tech: {b.technology} {/* Fixed mapping */}
-                      </span>
-                    </div>
+                      <div className="search-room-features" style={{ marginTop: "15px" }}>
+                        <span>Cap: {b.roomCapacity}</span>
+                        <span style={{ marginLeft: "10px" }}>Tech: {b.roomTechnology}</span>
+                      </div>
 
-                  </div>
-                ))
+                      {/* Cancel button — only for confirmed bookings */}
+                      {!isCancelled && (
+                        <button
+                          className="cancel-booking-btn"
+                          onClick={() => setCancelModal(b)}
+                          disabled={cancellingId === b.id}
+                        >
+                          {cancellingId === b.id ? "Cancelling..." : "Cancel Booking"}
+                        </button>
+                      )}
+                    </div>
+                  );
+                })
               ) : (
                 <div className="search-empty-state" style={{ gridColumn: "1 / -1", padding: "60px 20px" }}>
                   <h3 style={{ fontSize: "1.5rem", color: "#334155" }}>No bookings found</h3>
@@ -377,6 +432,36 @@ function Search() {
                 </div>
               )}
             </div>
+
+            {/* ---- Confirmation Modal ---- */}
+            {cancelModal && (
+              <div className="cancel-modal-overlay" onClick={() => setCancelModal(null)}>
+                <div className="cancel-modal" onClick={(e) => e.stopPropagation()}>
+                  <div className="cancel-modal-icon">⚠</div>
+                  <h2>Cancel Reservation?</h2>
+                  <p>
+                    Are you sure you want to cancel your booking for
+                    <strong> Room {cancelModal.roomName}</strong> on
+                    <strong> {cancelModal.date}</strong> from
+                    <strong> {cancelModal.startTime}</strong> to
+                    <strong> {cancelModal.endTime}</strong>?
+                  </p>
+                  <p className="cancel-modal-sub">This will free the time slot for other users.</p>
+                  <div className="cancel-modal-actions">
+                    <button className="cancel-modal-keep" onClick={() => setCancelModal(null)}>
+                      Keep Booking
+                    </button>
+                    <button
+                      className="cancel-modal-confirm"
+                      onClick={() => handleCancelBooking(cancelModal)}
+                      disabled={cancellingId === cancelModal.id}
+                    >
+                      {cancellingId === cancelModal.id ? "Processing..." : "Yes, Cancel It"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </main>
