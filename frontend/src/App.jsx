@@ -2,23 +2,23 @@ import { Routes, Route } from "react-router-dom";
 import Login from "./Pages/Login";
 import Signup from "./Pages/Signup";
 import Search from "./Pages/Search";
-
-function Home() {
-  return (
-    <div style={{ padding: "40px", fontFamily: "Arial, sans-serif" }}>
-      <h1>Main Page</h1>
-      <p>You can build this page later.</p>
-    </div>
-  );
-}
+import RoomBooking from "./Pages/RoomBooking";
 
 function App() {
   return (
     <Routes>
+      {/* Landing page is Login */}
       <Route path="/" element={<Login />} />
+      
+      {/* Auth Routes */}
       <Route path="/signup" element={<Signup />} />
-      <Route path="/home" element={<Home />} />
+      
+      {/* The Dashboard: Both paths now lead to your real 
+         search page with the 24-hour timeline 
+      */}
+      <Route path="/home" element={<Search />} />
       <Route path="/search" element={<Search />} />
+      <Route path="/room/:id/book" element={<RoomBooking />} />
     </Routes>
   );
 }

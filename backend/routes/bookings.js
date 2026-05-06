@@ -1,19 +1,77 @@
 const express = require('express');
 const router = express.Router();
-const Booking = require('../models/Booking'); // We will create this model next
+const Booking = require('../models/Booking'); 
+const sequelize = require('../config/database'); 
+const { QueryTypes } = require('sequelize');
 
 // JIRA TASK #7: Create Booking in DB
 router.post('/', async (req, res) => {
     try {
-        const { roomId, userId, timeSlot, date } = req.body;
+        const { roomId, userId, startTime, endTime, date } = req.body;
+
+        if (!roomId || !userId || !startTime || !endTime || !date) {
+            return res.status(400).json({ error: "Missing required fields" });
+        }
+
+        const startHour = parseInt(startTime.split(':')[0], 10);
+        const endHour = parseInt(endTime.split(':')[0], 10);
+
+        const durationRequested = endHour - startHour;
+
+        if (durationRequested > 4 || durationRequested <= 0) {
+            return res.status(400).json({ error: "Booking duration must be between 1 and 4 hours." });
+        }
+
+        // --- ENFORCE GLOBAL 4-HOUR DAILY LIMIT ---
+        const userDailyBookings = await Booking.findAll({
+            where: { userID: userId, date: date, status: 'Confirmed' }
+        });
+
+        let hoursUsedToday = 0;
+        userDailyBookings.forEach(b => {
+             const h1 = parseInt(b.startTime.split(':')[0], 10);
+             const h2 = b.endTime ? parseInt(b.endTime.split(':')[0], 10) : (h1 + 1);
+             hoursUsedToday += (h2 - h1);
+        });
+
+        if (hoursUsedToday + durationRequested > 4) {
+             return res.status(400).json({ error: "Daily limit of 4 hours exceeded. You have already booked " + hoursUsedToday + " hours today." });
+        }
+
+        // Check for conflicts in this specific room
+        const existingBookings = await Booking.findAll({
+            where: { roomID: roomId, date: date, status: 'Confirmed' }
+        });
+
+        const hasConflict = existingBookings.some(b => {
+            const bStart = parseInt(b.startTime.split(':')[0], 10);
+            const bEnd = b.endTime ? parseInt(b.endTime.split(':')[0], 10) : (bStart + 1);
+            // Overlap condition: newStart < existingEnd AND newEnd > existingStart
+            return startHour < bEnd && endHour > bStart;
+        });
+
+        if (hasConflict) {
+            return res.status(400).json({ error: "Time slot conflict with an existing booking." });
+        }
+
+        // --- PREVENT CROSS-ROOM OVERLAP FOR SAME USER ---
+        const userOverlap = userDailyBookings.some(b => {
+            const bStart = parseInt(b.startTime.split(':')[0], 10);
+            const bEnd = b.endTime ? parseInt(b.endTime.split(':')[0], 10) : (bStart + 1);
+            return startHour < bEnd && endHour > bStart;
+        });
+
+        if (userOverlap) {
+            return res.status(400).json({ error: "You already have a booking during this time slot. You cannot book two rooms at the same time." });
+        }
 
         // Create the record in PostgreSQL
         const newBooking = await Booking.create({
             roomID: roomId,
             userID: userId,
-            startTime: timeSlot, // Matches Milestone 2 naming
-            endTime: "1 hour later", // placeholder logic
-            date: date || "2026-04-15",
+            startTime, 
+            endTime, 
+            date,
             status: "Confirmed"
         });
 
@@ -27,21 +85,222 @@ router.post('/', async (req, res) => {
 // JIRA TASK #9: View My Bookings from DB
 router.get('/my-bookings/:userId', async (req, res) => {
     try {
-        const userId = parseInt(req.params.userId);
+        const userId = parseInt(req.params.userId, 10);
         
-        // Find all in DB where userID matches
-        const userBookings = await Booking.findAll({
-            where: { userID: userId },
-            order: [['startTime', 'ASC']] // AC: Sorted chronologically
+        // THIS IS THE SQL QUERY YOU ASKED ABOUT!
+        const sqlString = `
+            SELECT 
+                b.booking_id, 
+                b.start_time, 
+                b.end_time,
+                b.date, 
+                b.status, 
+                r.room_name, 
+                r.technology,
+                r.capacity   -- <-- Here is the capacity added!
+            FROM bookings b
+            JOIN rooms r ON b.room_id = r.id
+            WHERE b.user_id = :userId
+            ORDER BY b.booking_id DESC
+        `;
+
+        const userBookings = await sequelize.query(sqlString, {
+            replacements: { userId: userId },
+            type: QueryTypes.SELECT
         });
         
-        if (userBookings.length === 0) {
-            return res.status(200).json({ message: "No bookings yet.", bookings: [] });
-        }
-
         res.status(200).json({ success: true, bookings: userBookings });
     } catch (err) {
+        console.error("Fetch error:", err);
         res.status(500).json({ error: "Failed to fetch from PostgreSQL" });
+    }
+});
+
+// GET Daily Quota limits
+router.get('/quota/:userId/:date', async (req, res) => {
+    try {
+        const { userId, date } = req.params;
+        const userDailyBookings = await Booking.findAll({
+            where: { userID: parseInt(userId, 10), date: date, status: 'Confirmed' }
+        });
+
+        let usedHours = 0;
+        userDailyBookings.forEach(b => {
+             const h1 = parseInt(b.startTime.split(':')[0], 10);
+             const h2 = b.endTime ? parseInt(b.endTime.split(':')[0], 10) : (h1 + 1);
+             usedHours += (h2 - h1);
+        });
+        
+        res.status(200).json({ success: true, usedHours, limit: 4 });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: "Failed to fetch quota" });
+    }
+});
+
+// JIRA TASK #12: Cancel Booking (soft-cancel — status change preserves history)
+router.patch('/:bookingId/cancel', async (req, res) => {
+    try {
+        const bookingId = parseInt(req.params.bookingId, 10);
+        const { userId } = req.body;
+
+        if (!bookingId || isNaN(bookingId)) {
+            return res.status(400).json({ error: "Invalid booking ID." });
+        }
+
+        // Find the booking
+        const booking = await Booking.findByPk(bookingId);
+
+        if (!booking) {
+            return res.status(404).json({ error: "Booking not found." });
+        }
+
+        // Verify ownership
+        if (userId && booking.userID !== parseInt(userId, 10)) {
+            return res.status(403).json({ error: "You can only cancel your own bookings." });
+        }
+
+        // Prevent double-cancellation
+        if (booking.status === 'Cancelled') {
+            return res.status(400).json({ error: "This booking has already been cancelled." });
+        }
+
+        // Soft-cancel: change status to 'Cancelled' (retains data history)
+        booking.status = 'Cancelled';
+        await booking.save();
+
+        res.status(200).json({
+            success: true,
+            message: "Booking cancelled successfully. The time slot is now available for others.",
+            booking: {
+                id: booking.bookingID,
+                roomID: booking.roomID,
+                date: booking.date,
+                startTime: booking.startTime,
+                endTime: booking.endTime,
+                status: booking.status
+            }
+        });
+    } catch (err) {
+        console.error("Cancel booking error:", err);
+        res.status(500).json({ error: "Failed to cancel booking." });
+    }
+});
+// Edit Booking
+router.patch('/:bookingId', async (req, res) => {
+    try {
+        const bookingId = parseInt(req.params.bookingId, 10);
+        const { userId, roomId, startTime, endTime, date } = req.body;
+
+        if (!bookingId || isNaN(bookingId)) {
+            return res.status(400).json({ error: "Invalid booking ID." });
+        }
+
+        if (!userId || !roomId || !startTime || !endTime || !date) {
+            return res.status(400).json({ error: "Missing required fields." });
+        }
+
+        const booking = await Booking.findByPk(bookingId);
+
+        if (!booking) {
+            return res.status(404).json({ error: "Booking not found." });
+        }
+
+        if (booking.userID !== parseInt(userId, 10)) {
+            return res.status(403).json({ error: "You can only edit your own bookings." });
+        }
+
+        if (booking.status === 'Cancelled') {
+            return res.status(400).json({ error: "Cancelled bookings cannot be edited." });
+        }
+
+        const startHour = parseInt(startTime.split(':')[0], 10);
+        const endHour = parseInt(endTime.split(':')[0], 10);
+        const durationRequested = endHour - startHour;
+
+        if (durationRequested > 4 || durationRequested <= 0) {
+            return res.status(400).json({ error: "Booking duration must be between 1 and 4 hours." });
+        }
+
+        // Get user's bookings for the same date, excluding the booking being edited
+        const userDailyBookings = await Booking.findAll({
+            where: {
+                userID: parseInt(userId, 10),
+                date: date,
+                status: 'Confirmed'
+            }
+        });
+
+        const otherUserBookings = userDailyBookings.filter(
+            b => b.bookingID !== bookingId
+        );
+
+        let hoursUsedToday = 0;
+
+        otherUserBookings.forEach(b => {
+            const h1 = parseInt(b.startTime.split(':')[0], 10);
+            const h2 = b.endTime ? parseInt(b.endTime.split(':')[0], 10) : h1 + 1;
+            hoursUsedToday += h2 - h1;
+        });
+
+        if (hoursUsedToday + durationRequested > 4) {
+            return res.status(400).json({
+                error: "Daily limit of 4 hours exceeded. You have already booked " + hoursUsedToday + " hours today."
+            });
+        }
+
+        // Check room conflict, excluding the same booking
+        const existingRoomBookings = await Booking.findAll({
+            where: {
+                roomID: parseInt(roomId, 10),
+                date: date,
+                status: 'Confirmed'
+            }
+        });
+
+        const hasRoomConflict = existingRoomBookings.some(b => {
+            if (b.bookingID === bookingId) return false;
+
+            const bStart = parseInt(b.startTime.split(':')[0], 10);
+            const bEnd = b.endTime ? parseInt(b.endTime.split(':')[0], 10) : bStart + 1;
+
+            return startHour < bEnd && endHour > bStart;
+        });
+
+        if (hasRoomConflict) {
+            return res.status(400).json({ error: "Time slot conflict with an existing booking." });
+        }
+
+        // Prevent same user from having overlapping bookings
+        const userOverlap = otherUserBookings.some(b => {
+            const bStart = parseInt(b.startTime.split(':')[0], 10);
+            const bEnd = b.endTime ? parseInt(b.endTime.split(':')[0], 10) : bStart + 1;
+
+            return startHour < bEnd && endHour > bStart;
+        });
+
+        if (userOverlap) {
+            return res.status(400).json({
+                error: "You already have a booking during this time slot. You cannot book two rooms at the same time."
+            });
+        }
+
+        booking.roomID = parseInt(roomId, 10);
+        booking.startTime = startTime;
+        booking.endTime = endTime;
+        booking.date = date;
+
+        await booking.save();
+
+        res.status(200).json({
+            success: true,
+            message: "Booking updated successfully.",
+            booking
+        });
+
+    } catch (err) {
+        console.error("Edit booking error:", err);
+        res.status(500).json({ error: "Failed to edit booking." });
     }
 });
 

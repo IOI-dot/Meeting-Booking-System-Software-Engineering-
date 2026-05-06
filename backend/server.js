@@ -22,7 +22,7 @@ app.use('/api/bookings', bookingRoutes);
 app.use('/api/timeline', timelineRoutes); // Added from friend's push
 
 // Sync Database and Start
-sequelize.sync()
+sequelize.sync({ alter: true })
     .then(() => {
         console.log('✅ PostgreSQL Connected & Synced (Supabase)');
         app.listen(PORT, () => {
