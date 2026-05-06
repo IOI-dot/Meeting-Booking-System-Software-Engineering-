@@ -186,5 +186,122 @@ router.patch('/:bookingId/cancel', async (req, res) => {
         res.status(500).json({ error: "Failed to cancel booking." });
     }
 });
+// Edit Booking
+router.patch('/:bookingId', async (req, res) => {
+    try {
+        const bookingId = parseInt(req.params.bookingId, 10);
+        const { userId, roomId, startTime, endTime, date } = req.body;
+
+        if (!bookingId || isNaN(bookingId)) {
+            return res.status(400).json({ error: "Invalid booking ID." });
+        }
+
+        if (!userId || !roomId || !startTime || !endTime || !date) {
+            return res.status(400).json({ error: "Missing required fields." });
+        }
+
+        const booking = await Booking.findByPk(bookingId);
+
+        if (!booking) {
+            return res.status(404).json({ error: "Booking not found." });
+        }
+
+        if (booking.userID !== parseInt(userId, 10)) {
+            return res.status(403).json({ error: "You can only edit your own bookings." });
+        }
+
+        if (booking.status === 'Cancelled') {
+            return res.status(400).json({ error: "Cancelled bookings cannot be edited." });
+        }
+
+        const startHour = parseInt(startTime.split(':')[0], 10);
+        const endHour = parseInt(endTime.split(':')[0], 10);
+        const durationRequested = endHour - startHour;
+
+        if (durationRequested > 4 || durationRequested <= 0) {
+            return res.status(400).json({ error: "Booking duration must be between 1 and 4 hours." });
+        }
+
+        // Get user's bookings for the same date, excluding the booking being edited
+        const userDailyBookings = await Booking.findAll({
+            where: {
+                userID: parseInt(userId, 10),
+                date: date,
+                status: 'Confirmed'
+            }
+        });
+
+        const otherUserBookings = userDailyBookings.filter(
+            b => b.bookingID !== bookingId
+        );
+
+        let hoursUsedToday = 0;
+
+        otherUserBookings.forEach(b => {
+            const h1 = parseInt(b.startTime.split(':')[0], 10);
+            const h2 = b.endTime ? parseInt(b.endTime.split(':')[0], 10) : h1 + 1;
+            hoursUsedToday += h2 - h1;
+        });
+
+        if (hoursUsedToday + durationRequested > 4) {
+            return res.status(400).json({
+                error: "Daily limit of 4 hours exceeded. You have already booked " + hoursUsedToday + " hours today."
+            });
+        }
+
+        // Check room conflict, excluding the same booking
+        const existingRoomBookings = await Booking.findAll({
+            where: {
+                roomID: parseInt(roomId, 10),
+                date: date,
+                status: 'Confirmed'
+            }
+        });
+
+        const hasRoomConflict = existingRoomBookings.some(b => {
+            if (b.bookingID === bookingId) return false;
+
+            const bStart = parseInt(b.startTime.split(':')[0], 10);
+            const bEnd = b.endTime ? parseInt(b.endTime.split(':')[0], 10) : bStart + 1;
+
+            return startHour < bEnd && endHour > bStart;
+        });
+
+        if (hasRoomConflict) {
+            return res.status(400).json({ error: "Time slot conflict with an existing booking." });
+        }
+
+        // Prevent same user from having overlapping bookings
+        const userOverlap = otherUserBookings.some(b => {
+            const bStart = parseInt(b.startTime.split(':')[0], 10);
+            const bEnd = b.endTime ? parseInt(b.endTime.split(':')[0], 10) : bStart + 1;
+
+            return startHour < bEnd && endHour > bStart;
+        });
+
+        if (userOverlap) {
+            return res.status(400).json({
+                error: "You already have a booking during this time slot. You cannot book two rooms at the same time."
+            });
+        }
+
+        booking.roomID = parseInt(roomId, 10);
+        booking.startTime = startTime;
+        booking.endTime = endTime;
+        booking.date = date;
+
+        await booking.save();
+
+        res.status(200).json({
+            success: true,
+            message: "Booking updated successfully.",
+            booking
+        });
+
+    } catch (err) {
+        console.error("Edit booking error:", err);
+        res.status(500).json({ error: "Failed to edit booking." });
+    }
+});
 
 module.exports = router;
