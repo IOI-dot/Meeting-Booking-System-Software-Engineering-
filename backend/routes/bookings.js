@@ -90,14 +90,14 @@ router.get('/my-bookings/:userId', async (req, res) => {
         // THIS IS THE SQL QUERY YOU ASKED ABOUT!
         const sqlString = `
             SELECT 
-                b.booking_id, 
-                b.start_time, 
-                b.end_time,
+                b.booking_id AS "id", 
+                b.start_time AS "startTime", 
+                b.end_time AS "endTime",
                 b.date, 
                 b.status, 
-                r.room_name, 
-                r.technology,
-                r.capacity   -- <-- Here is the capacity added!
+                r.room_name AS "roomName", 
+                r.technology AS "roomTechnology",
+                r.capacity AS "roomCapacity"
             FROM bookings b
             JOIN rooms r ON b.room_id = r.id
             WHERE b.user_id = :userId
