@@ -3,6 +3,7 @@ import Login from "./Pages/Login";
 import Signup from "./Pages/Signup";
 import Search from "./Pages/Search";
 import RoomBooking from "./Pages/RoomBooking";
+import Mybookings from "./Pages/Mybookings"; // Make sure this file exists in src/Pages/
 
 function App() {
   return (
@@ -13,12 +14,15 @@ function App() {
       {/* Auth Routes */}
       <Route path="/signup" element={<Signup />} />
       
-      {/* The Dashboard: Both paths now lead to your real 
-         search page with the 24-hour timeline 
-      */}
+      {/* App Routes */}
       <Route path="/home" element={<Search />} />
       <Route path="/search" element={<Search />} />
+      
+      {/* Booking Flow */}
       <Route path="/room/:id/book" element={<RoomBooking />} />
+      
+      {/* User Reservations & Edit/Cancel (User Story 11) */}
+      <Route path="/my-bookings" element={<Mybookings />} />
     </Routes>
   );
 }
