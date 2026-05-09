@@ -143,6 +143,7 @@ router.patch('/:bookingId/cancel', async (req, res) => {
             return res.status(400).json({ error: "Invalid booking ID." });
         }
 
+        
         const booking = await Booking.findByPk(bookingId);
         if (!booking) return res.status(404).json({ error: "Booking not found." });
 
