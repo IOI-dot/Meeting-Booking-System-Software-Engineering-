@@ -155,6 +155,8 @@ router.patch('/:bookingId/cancel', async (req, res) => {
             return res.status(400).json({ error: "This booking has already been cancelled." });
         }
 
+
+        
         booking.status = 'Cancelled';
         await booking.save();
 
