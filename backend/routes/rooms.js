@@ -7,20 +7,10 @@
 
 const express = require('express');
 const { validateRoomSearch, ALLOWED_TECHNOLOGIES } = require('../validators/roomValidator');
+const Room = require('../models/Room');
+const { Op } = require('sequelize');
 
 const router = express.Router();
-
-// ─── Fake room data (will be replaced with DB later) ────────────────────────
-const rooms = [
-    { id: 1, name: "Room 101", capacity: 4,  technologies: ["projector", "whiteboards"] },
-    { id: 2, name: "Room 102", capacity: 10, technologies: ["4k display", "whiteboards", "video conf."] },
-    { id: 3, name: "Room 103", capacity: 6,  technologies: ["projector", "video conf."] },
-    { id: 4, name: "Room 201", capacity: 20, technologies: ["projectors", "whiteboards", "4k display"] },
-    { id: 5, name: "Room 202", capacity: 15, technologies: ["4k display", "projector"] },
-    { id: 6, name: "Room 301", capacity: 30, technologies: ["projectors", "4k display", "video conf.", "whiteboards"] },
-    { id: 7, name: "Room 302", capacity: 8,  technologies: ["whiteboards"] },
-    { id: 8, name: "Room 303", capacity: 2,  technologies: ["4k display"] },
-];
 
 /**
  * GET /api/rooms/technologies
@@ -50,7 +40,7 @@ router.get('/technologies', (req, res) => {
  *   400 - Validation errors
  *   500 - Server error
  */
-router.post('/search', (req, res) => {
+router.post('/search', async (req, res) => {
     try {
         const { capacity, technologies } = req.body;
 
@@ -66,15 +56,19 @@ router.post('/search', (req, res) => {
 
         const requestedCapacity = Number(capacity);
 
-        // 2. Filter rooms by capacity (room capacity >= requested)
-        let matchingRooms = rooms.filter(room => room.capacity >= requestedCapacity);
+        // 2. Query rooms from the database by capacity
+        const whereClause = {
+            capacity: { [Op.gte]: requestedCapacity }
+        };
+
+        let matchingRooms = await Room.findAll({ where: whereClause });
 
         // 3. Filter by technologies (if provided — room must have ALL requested techs)
         if (technologies && technologies.length > 0) {
             const requestedTechs = technologies.map(t => t.toLowerCase().trim());
             matchingRooms = matchingRooms.filter(room => {
-                const roomTechs = room.technologies.map(t => t.toLowerCase());
-                return requestedTechs.every(tech => roomTechs.includes(tech));
+                const roomTech = (room.technology || '').toLowerCase();
+                return requestedTechs.every(tech => roomTech.includes(tech.split(' ')[0]));
             });
         }
 
